@@ -2,7 +2,14 @@ import streamlit as st
 import pandas as pd
 import json
 import base64
+import os
 from datetime import datetime, date
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not installed, rely on env vars set manually
 
 # ─── Page Config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -316,16 +323,30 @@ DOC_TYPES = ["Purchase Invoice", "Sales Invoice", "Expense Receipt", "Credit Not
 
 
 # ─── Real OCR via Claude Vision ────────────────────────────────────────────────
-def real_ocr_extract(uploaded_file, api_key: str) -> dict:
+def get_api_key() -> str:
+    """Return API key — OS env var wins, sidebar widget is fallback."""
+    import os
+    env_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if env_key:
+        return env_key
+    # Read directly from the Streamlit widget value (most current value)
+    widget_key = st.session_state.get("api_key_widget", "").strip()
+    if widget_key:
+        return widget_key
+    return st.session_state.get("api_key", "").strip()
+
+
+def real_ocr_extract(uploaded_file) -> dict:
     """
     Extracts financial fields from an uploaded invoice/receipt
     using the Claude Vision API (claude-opus-4-5).
+    Reads the API key internally via get_api_key().
     """
-    try:
-        import anthropic
-    except ImportError:
-        st.error("anthropic package not installed. Run: pip install anthropic")
-        return None
+    import anthropic
+
+    api_key = get_api_key()
+    if not api_key:
+        raise ValueError("No API key found. Set ANTHROPIC_API_KEY env var or enter it in the sidebar.")
 
     # Read and base64-encode the file
     file_bytes = uploaded_file.read()
@@ -476,13 +497,13 @@ with st.sidebar:
     )
     api_key_input = st.text_input(
         "API Key",
-        value=st.session_state.api_key,
         type="password",
         placeholder="sk-ant-...",
         label_visibility="collapsed",
+        key="api_key_widget",
     )
-    if api_key_input:
-        st.session_state.api_key = api_key_input
+    # Always sync whatever is currently typed into session state
+    st.session_state.api_key = api_key_input.strip()
 
     if st.session_state.api_key:
         st.markdown(
@@ -631,18 +652,23 @@ elif page == "Upload & Extract":
             st.markdown("<br>", unsafe_allow_html=True)
 
             if st.button("🔍 Extract with Claude Vision", use_container_width=True):
-                if not st.session_state.api_key:
-                    st.error("API key required. Add it in the sidebar.")
+                live_key = get_api_key()
+                if not live_key:
+                    st.error("API key required. Set ANTHROPIC_API_KEY env var or enter it in the sidebar.")
+                elif not (live_key.startswith("sk-ant-") or live_key.startswith("sk-")):
+                    st.error("Key looks wrong — Anthropic keys start with `sk-ant-`. Check for extra spaces or line breaks.")
                 else:
                     with st.spinner("🔍 Claude is reading your document..."):
                         try:
                             uploaded_file.seek(0)
-                            extracted = real_ocr_extract(uploaded_file, st.session_state.api_key)
+                            extracted = real_ocr_extract(uploaded_file)
                             if extracted:
                                 st.session_state.extracted = extracted
                                 st.success("✓ Extraction complete!")
+                        except ValueError as e:
+                            st.error(str(e))
                         except json.JSONDecodeError:
-                            st.error("Could not parse the response as JSON. Try again or check the document quality.")
+                            st.error("Could not parse Claude's response as JSON. Try again or check document quality.")
                         except Exception as e:
                             st.error(f"Extraction failed: {e}")
 
