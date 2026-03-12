@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
 import json
-from datetime import datetime, date
-import io
 import base64
+from datetime import datetime, date
 
 # ─── Page Config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -18,7 +17,6 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap');
 
-/* ── Root Variables ── */
 :root {
     --bg:         #0A0C10;
     --surface:    #111318;
@@ -34,7 +32,6 @@ st.markdown("""
     --danger:     #FF6B6B;
 }
 
-/* ── Global Reset ── */
 html, body, [class*="css"] {
     font-family: 'DM Sans', sans-serif;
     background-color: var(--bg);
@@ -42,12 +39,9 @@ html, body, [class*="css"] {
 }
 
 .stApp { background-color: var(--bg); }
-
-/* ── Hide Streamlit chrome ── */
 #MainMenu, footer, header { visibility: hidden; }
 .block-container { padding: 2rem 2.5rem 4rem; max-width: 1400px; }
 
-/* ── Sidebar ── */
 [data-testid="stSidebar"] {
     background: var(--surface) !important;
     border-right: 1px solid var(--border);
@@ -59,7 +53,6 @@ html, body, [class*="css"] {
     color: var(--accent);
 }
 
-/* ── Logo Banner ── */
 .finflow-logo {
     font-family: 'Syne', sans-serif;
     font-weight: 800;
@@ -80,7 +73,6 @@ html, body, [class*="css"] {
     margin-top: 0.3rem;
 }
 
-/* ── Stat Cards ── */
 .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
 .stat-card {
     background: var(--surface);
@@ -103,7 +95,6 @@ html, body, [class*="css"] {
 .stat-value { font-family: 'Syne', sans-serif; font-size: 1.8rem; font-weight: 700; color: var(--text); }
 .stat-delta { font-size: 0.75rem; color: var(--success); margin-top: 0.3rem; }
 
-/* ── Section Headers ── */
 .section-header {
     font-family: 'Syne', sans-serif;
     font-weight: 700;
@@ -121,7 +112,6 @@ html, body, [class*="css"] {
     background: var(--border);
 }
 
-/* ── Upload Zone ── */
 .upload-zone {
     border: 1.5px dashed var(--border);
     border-radius: 16px;
@@ -136,7 +126,6 @@ html, body, [class*="css"] {
 .upload-title { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 600; margin-bottom: 0.4rem; }
 .upload-sub { color: var(--muted); font-size: 0.85rem; }
 
-/* ── Extracted Data Card ── */
 .extracted-card {
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -156,7 +145,6 @@ html, body, [class*="css"] {
 .field-key { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.8rem; }
 .field-val { color: var(--accent); font-weight: 500; }
 
-/* ── Streamlit Widgets Reskin ── */
 .stButton > button {
     background: linear-gradient(135deg, #00E5A0, #00C88A) !important;
     color: #0A0C10 !important;
@@ -175,7 +163,6 @@ html, body, [class*="css"] {
     box-shadow: 0 6px 20px rgba(0,229,160,0.35) !important;
 }
 
-/* Secondary button */
 .btn-secondary > button {
     background: var(--surface2) !important;
     color: var(--text) !important;
@@ -188,7 +175,6 @@ html, body, [class*="css"] {
     box-shadow: none !important;
 }
 
-/* Text inputs */
 .stTextInput > div > div > input,
 .stNumberInput > div > div > input,
 .stSelectbox > div > div,
@@ -206,10 +192,8 @@ html, body, [class*="css"] {
     box-shadow: 0 0 0 2px rgba(0,229,160,0.15) !important;
 }
 
-/* Labels */
 label, .stSelectbox label, .stTextInput label { color: var(--muted) !important; font-size: 0.8rem !important; font-family: 'DM Mono', monospace !important; text-transform: uppercase !important; letter-spacing: 0.1em !important; }
 
-/* Tabs */
 .stTabs [data-baseweb="tab-list"] {
     background: var(--surface) !important;
     border-radius: 10px !important;
@@ -233,24 +217,20 @@ label, .stSelectbox label, .stTextInput label { color: var(--muted) !important; 
     border: 1px solid var(--border) !important;
 }
 
-/* Dataframe */
 .stDataFrame { border: 1px solid var(--border) !important; border-radius: 10px !important; overflow: hidden !important; }
 [data-testid="stDataFrameResizable"] { background: var(--surface) !important; }
 
-/* Alerts */
 .stSuccess { background: rgba(0,229,160,0.08) !important; border-left: 3px solid var(--success) !important; color: var(--text) !important; border-radius: 8px !important; }
 .stWarning { background: rgba(255,181,71,0.08) !important; border-left: 3px solid var(--warning) !important; }
 .stError   { background: rgba(255,107,107,0.08) !important; border-left: 3px solid var(--danger) !important; }
 .stInfo    { background: rgba(123,97,255,0.08) !important; border-left: 3px solid var(--accent2) !important; }
 
-/* File uploader */
 [data-testid="stFileUploadDropzone"] {
     background: var(--surface) !important;
     border: 1.5px dashed var(--border) !important;
     border-radius: 12px !important;
 }
 
-/* Metrics */
 [data-testid="stMetric"] {
     background: var(--surface) !important;
     border: 1px solid var(--border) !important;
@@ -260,7 +240,6 @@ label, .stSelectbox label, .stTextInput label { color: var(--muted) !important; 
 [data-testid="stMetricValue"] { font-family: 'Syne', sans-serif !important; color: var(--text) !important; }
 [data-testid="stMetricDelta"] { font-family: 'DM Mono', monospace !important; }
 
-/* Sidebar nav items */
 .nav-item {
     display: flex;
     align-items: center;
@@ -277,7 +256,6 @@ label, .stSelectbox label, .stTextInput label { color: var(--muted) !important; 
 .nav-item:hover { background: var(--surface2); color: var(--text); }
 .nav-item.active { background: rgba(0,229,160,0.1); color: var(--accent); border: 1px solid rgba(0,229,160,0.2); }
 
-/* Badge */
 .badge {
     display: inline-block;
     padding: 0.2rem 0.6rem;
@@ -290,28 +268,20 @@ label, .stSelectbox label, .stTextInput label { color: var(--muted) !important; 
 .badge-purple { background: rgba(123,97,255,0.1); color: var(--accent2); border: 1px solid rgba(123,97,255,0.25); }
 .badge-red { background: rgba(255,107,107,0.1); color: var(--danger); border: 1px solid rgba(255,107,107,0.25); }
 
-/* Table override */
 thead th { background: var(--surface2) !important; color: var(--muted) !important; font-family: 'DM Mono', monospace !important; font-size: 0.75rem !important; text-transform: uppercase !important; }
 tbody tr:hover { background: rgba(0,229,160,0.03) !important; }
 
-/* Divider */
 hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
 
-/* Expander */
 [data-testid="stExpander"] {
     background: var(--surface) !important;
     border: 1px solid var(--border) !important;
     border-radius: 10px !important;
 }
 
-/* Radio */
 .stRadio > div { gap: 0.5rem; }
 .stRadio label { color: var(--text) !important; font-size: 0.9rem !important; text-transform: none !important; letter-spacing: 0 !important; }
-
-/* Checkbox */
 .stCheckbox label { color: var(--text) !important; text-transform: none !important; letter-spacing: 0 !important; }
-
-/* Progress bar */
 .stProgress > div > div { background: linear-gradient(90deg, var(--accent), var(--accent2)) !important; border-radius: 100px !important; }
 .stProgress > div { background: var(--surface2) !important; border-radius: 100px !important; }
 </style>
@@ -328,6 +298,7 @@ def init_state():
         ]),
         "counter": 1,
         "extracted": None,
+        "api_key": "",
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -344,37 +315,109 @@ CATEGORIES = [
 DOC_TYPES = ["Purchase Invoice", "Sales Invoice", "Expense Receipt", "Credit Note", "Debit Note"]
 
 
+# ─── Real OCR via Claude Vision ────────────────────────────────────────────────
+def real_ocr_extract(uploaded_file, api_key: str) -> dict:
+    """
+    Extracts financial fields from an uploaded invoice/receipt
+    using the Claude Vision API (claude-opus-4-5).
+    """
+    try:
+        import anthropic
+    except ImportError:
+        st.error("anthropic package not installed. Run: pip install anthropic")
+        return None
+
+    # Read and base64-encode the file
+    file_bytes = uploaded_file.read()
+    b64_data = base64.standard_b64encode(file_bytes).decode("utf-8")
+
+    ext = uploaded_file.name.lower().rsplit(".", 1)[-1]
+    media_map = {
+        "pdf":  "application/pdf",
+        "png":  "image/png",
+        "jpg":  "image/jpeg",
+        "jpeg": "image/jpeg",
+        "webp": "image/webp",
+    }
+    media_type = media_map.get(ext, "image/jpeg")
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    prompt = f"""You are a financial document OCR assistant specialized in Indian GST invoices and receipts.
+
+Extract all financial data from this document and return ONLY a valid JSON object — no markdown, no explanation, no code fences.
+
+Use exactly these keys:
+{{
+  "vendor": "company or shop name",
+  "date": "DD-MM-YYYY format, use today if not found",
+  "gstin": "15-character GSTIN if present, else empty string",
+  "doc_type": "one of: Purchase Invoice, Sales Invoice, Expense Receipt, Credit Note, Debit Note",
+  "subtotal": 0.00,
+  "cgst": 0.00,
+  "sgst": 0.00,
+  "igst": 0.00,
+  "total": 0.00,
+  "category": "one of: {', '.join(CATEGORIES)}",
+  "confidence": 95
+}}
+
+Rules:
+- All amounts must be numbers (floats), not strings.
+- If CGST/SGST/IGST are not shown separately, estimate from total (18% GST = 9% CGST + 9% SGST for intra-state).
+- confidence is your estimate of extraction accuracy (0-100).
+- Return ONLY the JSON object."""
+
+    message = client.messages.create(
+        model="claude-opus-4-5",
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": b64_data,
+                        },
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ],
+    )
+
+    raw = message.content[0].text.strip()
+
+    # Strip accidental markdown fences
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        raw = parts[1] if len(parts) > 1 else raw
+        if raw.startswith("json"):
+            raw = raw[4:]
+
+    extracted = json.loads(raw.strip())
+
+    # Ensure numeric types
+    for key in ["subtotal", "cgst", "sgst", "igst", "total"]:
+        extracted[key] = float(extracted.get(key, 0.0))
+
+    extracted["confidence"] = int(extracted.get("confidence", 90))
+
+    # Clamp doc_type and category to valid options
+    if extracted.get("doc_type") not in DOC_TYPES:
+        extracted["doc_type"] = "Purchase Invoice"
+    if extracted.get("category") not in CATEGORIES:
+        extracted["category"] = "Miscellaneous"
+
+    return extracted
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 def make_id(prefix="TXN"):
     return f"{prefix}-{datetime.now().strftime('%y%m%d')}-{st.session_state.counter:04d}"
-
-def fake_ocr_extract(filename: str) -> dict:
-    """Simulates OCR extraction from uploaded document."""
-    import random, hashlib
-    seed = int(hashlib.md5(filename.encode()).hexdigest(), 16) % 10000
-    random.seed(seed)
-    vendors = ["Reliance Industries", "Tata Consultancy", "HDFC Bank", "Infosys Ltd",
-               "Wipro Technologies", "Amazon India", "Flipkart Pvt Ltd", "Zomato Ltd"]
-    vendor = random.choice(vendors)
-    subtotal = round(random.uniform(500, 50000), 2)
-    cgst = round(subtotal * 0.09, 2)
-    sgst = round(subtotal * 0.09, 2)
-    total = round(subtotal + cgst + sgst, 2)
-    gstin_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    gstin = f"{random.randint(10,37)}{''.join(random.choices(gstin_chars, k=13))}"
-    return {
-        "vendor": vendor,
-        "date": (date.today()).strftime("%d-%m-%Y"),
-        "gstin": gstin,
-        "doc_type": random.choice(DOC_TYPES),
-        "subtotal": subtotal,
-        "cgst": cgst,
-        "sgst": sgst,
-        "igst": 0.0,
-        "total": total,
-        "category": random.choice(CATEGORIES),
-        "confidence": random.randint(88, 99),
-    }
 
 def add_to_register(data: dict, entry_type: str):
     txn_id = make_id()
@@ -423,7 +466,42 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("<div style='font-family:DM Mono,monospace;font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.75rem;'>Navigation</div>", unsafe_allow_html=True)
+
+    # ── API Key input ──
+    st.markdown(
+        "<div style='font-family:DM Mono,monospace;font-size:0.7rem;color:var(--muted);"
+        "text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.4rem;'>"
+        "Anthropic API Key</div>",
+        unsafe_allow_html=True,
+    )
+    api_key_input = st.text_input(
+        "API Key",
+        value=st.session_state.api_key,
+        type="password",
+        placeholder="sk-ant-...",
+        label_visibility="collapsed",
+    )
+    if api_key_input:
+        st.session_state.api_key = api_key_input
+
+    if st.session_state.api_key:
+        st.markdown(
+            "<div style='color:#00E5A0;font-size:0.78rem;margin-bottom:0.5rem;'>✓ API key set</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            "<div style='color:#FFB547;font-size:0.78rem;margin-bottom:0.5rem;'>"
+            "⚠ Enter key to enable OCR</div>",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+    st.markdown(
+        "<div style='font-family:DM Mono,monospace;font-size:0.7rem;color:var(--muted);"
+        "text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.75rem;'>Navigation</div>",
+        unsafe_allow_html=True,
+    )
 
     pages = [
         ("📊", "Dashboard"),
@@ -435,7 +513,6 @@ with st.sidebar:
     ]
 
     for icon, name in pages:
-        active = "active" if st.session_state.page == name else ""
         if st.button(f"{icon}  {name}", key=f"nav_{name}", use_container_width=True):
             st.session_state.page = name
             st.rerun()
@@ -463,13 +540,13 @@ page = st.session_state.page
 # ── DASHBOARD ─────────────────────────────────────────────────────────────────
 if page == "Dashboard":
     st.markdown('<div class="finflow-logo" style="font-size:2rem;margin-bottom:0.25rem;">FinFlow</div>', unsafe_allow_html=True)
-    st.markdown('<p style="color:var(--muted);font-size:0.9rem;margin-bottom:2rem;">Automated Financial Document Processing — Wave 3.0</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color:var(--muted);font-size:0.9rem;margin-bottom:2rem;">Automated Financial Document Processing — Claude Vision OCR</p>', unsafe_allow_html=True)
 
     summary = get_summary()
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Total Transactions", summary["total_txns"], delta=None)
+        st.metric("Total Transactions", summary["total_txns"])
     with col2:
         st.metric("Total Purchases", f"₹{summary['total_purchase']:,.2f}")
     with col3:
@@ -516,6 +593,7 @@ if page == "Dashboard":
         </div>
         """, unsafe_allow_html=True)
 
+    df = st.session_state.register
     if not df.empty:
         st.markdown('<div class="section-header">🕒 Recent Transactions</div>', unsafe_allow_html=True)
         recent = df.tail(5)[["ID", "Date", "Vendor", "Type", "Total", "Status"]].copy()
@@ -526,7 +604,11 @@ if page == "Dashboard":
 # ── UPLOAD & EXTRACT ──────────────────────────────────────────────────────────
 elif page == "Upload & Extract":
     st.markdown('<div class="section-header" style="font-family:Syne,sans-serif;font-size:1.6rem;font-weight:800;">📤 Upload & Extract</div>', unsafe_allow_html=True)
-    st.markdown('<p style="color:var(--muted);">Upload handwritten receipts, printed invoices, or PDF documents. OCR extracts all key financial fields instantly.</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color:var(--muted);">Upload handwritten receipts, printed invoices, or PDF documents. Claude Vision reads and extracts all key financial fields.</p>', unsafe_allow_html=True)
+
+    # Warn if no API key
+    if not st.session_state.api_key:
+        st.warning("⚠️ Please enter your Anthropic API key in the sidebar to enable real OCR extraction.")
 
     col1, col2 = st.columns([1.1, 0.9])
 
@@ -539,36 +621,58 @@ elif page == "Upload & Extract":
 
         if uploaded_file:
             st.success(f"✓ File received: **{uploaded_file.name}** ({uploaded_file.size // 1024} KB)")
+
+            # Show image preview for non-PDF
+            ext = uploaded_file.name.lower().rsplit(".", 1)[-1]
+            if ext in ("png", "jpg", "jpeg", "webp"):
+                st.image(uploaded_file, caption="Uploaded document", use_container_width=True)
+                uploaded_file.seek(0)  # Reset after preview read
+
             st.markdown("<br>", unsafe_allow_html=True)
 
-            with st.spinner("🔍 Running OCR & field extraction..."):
-                import time; time.sleep(1.2)
-                extracted = fake_ocr_extract(uploaded_file.name)
-                st.session_state.extracted = extracted
+            if st.button("🔍 Extract with Claude Vision", use_container_width=True):
+                if not st.session_state.api_key:
+                    st.error("API key required. Add it in the sidebar.")
+                else:
+                    with st.spinner("🔍 Claude is reading your document..."):
+                        try:
+                            uploaded_file.seek(0)
+                            extracted = real_ocr_extract(uploaded_file, st.session_state.api_key)
+                            if extracted:
+                                st.session_state.extracted = extracted
+                                st.success("✓ Extraction complete!")
+                        except json.JSONDecodeError:
+                            st.error("Could not parse the response as JSON. Try again or check the document quality.")
+                        except Exception as e:
+                            st.error(f"Extraction failed: {e}")
 
-            st.markdown('<div class="section-header">🔎 Extracted Fields</div>', unsafe_allow_html=True)
-            conf = extracted["confidence"]
-            st.markdown(f"""
-            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
-                <span style="font-family:DM Mono,monospace;font-size:0.78rem;color:var(--muted);">OCR Confidence</span>
-                <span style="font-family:Syne,sans-serif;font-weight:700;color:var(--accent);">{conf}%</span>
-            </div>
-            """, unsafe_allow_html=True)
-            st.progress(conf / 100)
+            if st.session_state.extracted:
+                extracted = st.session_state.extracted
+                conf = extracted.get("confidence", 90)
 
-            st.markdown(f"""
-            <div class="extracted-card">
-                <div class="extracted-field"><span class="field-key">Vendor / Shop</span><span class="field-val">{extracted['vendor']}</span></div>
-                <div class="extracted-field"><span class="field-key">Doc Type</span><span class="field-val">{extracted['doc_type']}</span></div>
-                <div class="extracted-field"><span class="field-key">Date</span><span class="field-val">{extracted['date']}</span></div>
-                <div class="extracted-field"><span class="field-key">GSTIN</span><span class="field-val" style="font-family:DM Mono,monospace;font-size:0.85rem;">{extracted['gstin']}</span></div>
-                <div class="extracted-field"><span class="field-key">Category</span><span class="field-val">{extracted['category']}</span></div>
-                <div class="extracted-field"><span class="field-key">Subtotal</span><span class="field-val">₹{extracted['subtotal']:,.2f}</span></div>
-                <div class="extracted-field"><span class="field-key">CGST (9%)</span><span class="field-val">₹{extracted['cgst']:,.2f}</span></div>
-                <div class="extracted-field"><span class="field-key">SGST (9%)</span><span class="field-val">₹{extracted['sgst']:,.2f}</span></div>
-                <div class="extracted-field"><span class="field-key">Total Amount</span><span class="field-val" style="font-size:1.1rem;font-weight:700;">₹{extracted['total']:,.2f}</span></div>
-            </div>
-            """, unsafe_allow_html=True)
+                st.markdown('<div class="section-header">🔎 Extracted Fields</div>', unsafe_allow_html=True)
+                st.markdown(f"""
+                <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+                    <span style="font-family:DM Mono,monospace;font-size:0.78rem;color:var(--muted);">OCR Confidence</span>
+                    <span style="font-family:Syne,sans-serif;font-weight:700;color:var(--accent);">{conf}%</span>
+                </div>
+                """, unsafe_allow_html=True)
+                st.progress(conf / 100)
+
+                st.markdown(f"""
+                <div class="extracted-card">
+                    <div class="extracted-field"><span class="field-key">Vendor / Shop</span><span class="field-val">{extracted.get('vendor','')}</span></div>
+                    <div class="extracted-field"><span class="field-key">Doc Type</span><span class="field-val">{extracted.get('doc_type','')}</span></div>
+                    <div class="extracted-field"><span class="field-key">Date</span><span class="field-val">{extracted.get('date','')}</span></div>
+                    <div class="extracted-field"><span class="field-key">GSTIN</span><span class="field-val" style="font-family:DM Mono,monospace;font-size:0.85rem;">{extracted.get('gstin','—')}</span></div>
+                    <div class="extracted-field"><span class="field-key">Category</span><span class="field-val">{extracted.get('category','')}</span></div>
+                    <div class="extracted-field"><span class="field-key">Subtotal</span><span class="field-val">₹{extracted.get('subtotal',0):,.2f}</span></div>
+                    <div class="extracted-field"><span class="field-key">CGST</span><span class="field-val">₹{extracted.get('cgst',0):,.2f}</span></div>
+                    <div class="extracted-field"><span class="field-key">SGST</span><span class="field-val">₹{extracted.get('sgst',0):,.2f}</span></div>
+                    <div class="extracted-field"><span class="field-key">IGST</span><span class="field-val">₹{extracted.get('igst',0):,.2f}</span></div>
+                    <div class="extracted-field"><span class="field-key">Total Amount</span><span class="field-val" style="font-size:1.1rem;font-weight:700;">₹{extracted.get('total',0):,.2f}</span></div>
+                </div>
+                """, unsafe_allow_html=True)
 
     with col2:
         st.markdown('<div class="section-header">✏️ Review & Confirm</div>', unsafe_allow_html=True)
@@ -576,19 +680,25 @@ elif page == "Upload & Extract":
         if st.session_state.extracted:
             ext = st.session_state.extracted
             with st.form("confirm_form"):
-                vendor = st.text_input("Vendor Name", value=ext["vendor"])
-                doc_type = st.selectbox("Document Type", DOC_TYPES, index=DOC_TYPES.index(ext["doc_type"]) if ext["doc_type"] in DOC_TYPES else 0)
-                txn_date = st.text_input("Transaction Date", value=ext["date"])
-                gstin = st.text_input("GSTIN", value=ext["gstin"])
-                category = st.selectbox("Category", CATEGORIES, index=CATEGORIES.index(ext["category"]) if ext["category"] in CATEGORIES else 0)
+                vendor = st.text_input("Vendor Name", value=ext.get("vendor", ""))
+                doc_type = st.selectbox(
+                    "Document Type", DOC_TYPES,
+                    index=DOC_TYPES.index(ext["doc_type"]) if ext.get("doc_type") in DOC_TYPES else 0
+                )
+                txn_date = st.text_input("Transaction Date", value=ext.get("date", ""))
+                gstin = st.text_input("GSTIN", value=ext.get("gstin", ""))
+                category = st.selectbox(
+                    "Category", CATEGORIES,
+                    index=CATEGORIES.index(ext["category"]) if ext.get("category") in CATEGORIES else 0
+                )
 
                 c1, c2 = st.columns(2)
                 with c1:
-                    subtotal = st.number_input("Subtotal (₹)", value=float(ext["subtotal"]), min_value=0.0, step=0.01)
-                    cgst = st.number_input("CGST (₹)", value=float(ext["cgst"]), min_value=0.0, step=0.01)
+                    subtotal = st.number_input("Subtotal (₹)", value=float(ext.get("subtotal", 0)), min_value=0.0, step=0.01)
+                    cgst = st.number_input("CGST (₹)", value=float(ext.get("cgst", 0)), min_value=0.0, step=0.01)
                 with c2:
-                    sgst = st.number_input("SGST (₹)", value=float(ext["sgst"]), min_value=0.0, step=0.01)
-                    igst = st.number_input("IGST (₹)", value=0.0, min_value=0.0, step=0.01)
+                    sgst = st.number_input("SGST (₹)", value=float(ext.get("sgst", 0)), min_value=0.0, step=0.01)
+                    igst = st.number_input("IGST (₹)", value=float(ext.get("igst", 0)), min_value=0.0, step=0.01)
 
                 total_calc = subtotal + cgst + sgst + igst
                 st.markdown(f"""
@@ -612,7 +722,7 @@ elif page == "Upload & Extract":
             st.markdown("""
             <div style="background:var(--surface);border:1px dashed var(--border);border-radius:12px;padding:3rem 2rem;text-align:center;margin-top:1rem;">
                 <div style="font-size:2.5rem;margin-bottom:0.75rem;">🔍</div>
-                <div style="color:var(--muted);font-size:0.9rem;">Upload a document on the left to review extracted fields here</div>
+                <div style="color:var(--muted);font-size:0.9rem;">Upload a document and click <strong>Extract with Claude Vision</strong> to see fields here</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -705,7 +815,6 @@ elif page == "Register":
 
     df = st.session_state.register.copy()
 
-    # Filters
     with st.expander("🔍 Filters & Search", expanded=False):
         f1, f2, f3 = st.columns(3)
         with f1:
@@ -790,7 +899,7 @@ elif page == "Reconciliation":
         col1, col2, col3 = st.columns(3)
         with col1:
             net_cgst = sales_tax["CGST"] - purchase_tax["CGST"]
-            st.metric("Net CGST Payable", f"₹{net_cgst:,.2f}", delta=f"Sales-Purchase")
+            st.metric("Net CGST Payable", f"₹{net_cgst:,.2f}", delta="Sales-Purchase")
         with col2:
             net_sgst = sales_tax["SGST"] - purchase_tax["SGST"]
             st.metric("Net SGST Payable", f"₹{net_sgst:,.2f}")
