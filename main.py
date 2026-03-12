@@ -322,118 +322,201 @@ CATEGORIES = [
 DOC_TYPES = ["Purchase Invoice", "Sales Invoice", "Expense Receipt", "Credit Note", "Debit Note"]
 
 
-# ─── Real OCR via Claude Vision ────────────────────────────────────────────────
-def get_api_key() -> str:
-    """Return API key — OS env var wins, sidebar widget is fallback."""
-    import os
-    env_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if env_key:
-        return env_key
-    # Read directly from the Streamlit widget value (most current value)
-    widget_key = st.session_state.get("api_key_widget", "").strip()
-    if widget_key:
-        return widget_key
-    return st.session_state.get("api_key", "").strip()
-
-
+# ─── OCR via Tesseract (100% Free, Local) ─────────────────────────────────────
 def real_ocr_extract(uploaded_file) -> dict:
     """
     Extracts financial fields from an uploaded invoice/receipt
-    using the Claude Vision API (claude-opus-4-5).
-    Reads the API key internally via get_api_key().
+    using Tesseract OCR — runs locally, no API key needed.
+    Requires: pip install pytesseract pillow pdf2image
+    Windows: install Tesseract from https://github.com/UB-Mannheim/tesseract/wiki
     """
-    import anthropic
+    try:
+        import pytesseract
+        from PIL import Image
+    except ImportError:
+        raise ImportError("Run: pip install pytesseract pillow pdf2image")
 
-    api_key = get_api_key()
-    if not api_key:
-        raise ValueError("No API key found. Set ANTHROPIC_API_KEY env var or enter it in the sidebar.")
-
-    # Read and base64-encode the file
-    file_bytes = uploaded_file.read()
-    b64_data = base64.standard_b64encode(file_bytes).decode("utf-8")
+    # ── Windows: point to Tesseract executable ──
+    import shutil
+    if shutil.which("tesseract") is None:
+        # Common Windows install paths
+        for path in [
+            r"C:\Program Files\Tesseract-OCR	esseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR	esseract.exe",
+        ]:
+            if os.path.exists(path):
+                pytesseract.pytesseract.tesseract_cmd = path
+                break
 
     ext = uploaded_file.name.lower().rsplit(".", 1)[-1]
-    media_map = {
-        "pdf":  "application/pdf",
-        "png":  "image/png",
-        "jpg":  "image/jpeg",
-        "jpeg": "image/jpeg",
-        "webp": "image/webp",
-    }
-    media_type = media_map.get(ext, "image/jpeg")
+    file_bytes = uploaded_file.read()
 
-    client = anthropic.Anthropic(api_key=api_key)
+    # ── Convert to PIL Image ──
+    if ext == "pdf":
+        # Try pymupdf first (no system dependencies, pure Python)
+        try:
+            import fitz  # pymupdf
+            pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+            page = pdf_doc[0]
+            mat = fitz.Matrix(3, 3)  # 3x zoom = ~300 dpi
+            pix = page.get_pixmap(matrix=mat)
+            from io import BytesIO
+            img = Image.open(BytesIO(pix.tobytes("png")))
+        except ImportError:
+            # Fallback to pdf2image + poppler
+            try:
+                from pdf2image import convert_from_bytes
+                pages = convert_from_bytes(file_bytes, dpi=300)
+                img = pages[0]
+            except Exception:
+                raise ImportError(
+                    "PDF support requires pymupdf. Run: pip install pymupdf"
+                )
+    else:
+        from io import BytesIO
+        img = Image.open(BytesIO(file_bytes))
 
-    prompt = f"""You are a financial document OCR assistant specialized in Indian GST invoices and receipts.
+    # ── Run Tesseract ──
+    raw_text = pytesseract.image_to_string(img, lang="eng")
 
-Extract all financial data from this document and return ONLY a valid JSON object — no markdown, no explanation, no code fences.
-
-Use exactly these keys:
-{{
-  "vendor": "company or shop name",
-  "date": "DD-MM-YYYY format, use today if not found",
-  "gstin": "15-character GSTIN if present, else empty string",
-  "doc_type": "one of: Purchase Invoice, Sales Invoice, Expense Receipt, Credit Note, Debit Note",
-  "subtotal": 0.00,
-  "cgst": 0.00,
-  "sgst": 0.00,
-  "igst": 0.00,
-  "total": 0.00,
-  "category": "one of: {', '.join(CATEGORIES)}",
-  "confidence": 95
-}}
-
-Rules:
-- All amounts must be numbers (floats), not strings.
-- If CGST/SGST/IGST are not shown separately, estimate from total (18% GST = 9% CGST + 9% SGST for intra-state).
-- confidence is your estimate of extraction accuracy (0-100).
-- Return ONLY the JSON object."""
-
-    message = client.messages.create(
-        model="claude-opus-4-5",
-        max_tokens=1024,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": media_type,
-                            "data": b64_data,
-                        },
-                    },
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ],
-    )
-
-    raw = message.content[0].text.strip()
-
-    # Strip accidental markdown fences
-    if raw.startswith("```"):
-        parts = raw.split("```")
-        raw = parts[1] if len(parts) > 1 else raw
-        if raw.startswith("json"):
-            raw = raw[4:]
-
-    extracted = json.loads(raw.strip())
-
-    # Ensure numeric types
-    for key in ["subtotal", "cgst", "sgst", "igst", "total"]:
-        extracted[key] = float(extracted.get(key, 0.0))
-
-    extracted["confidence"] = int(extracted.get("confidence", 90))
-
-    # Clamp doc_type and category to valid options
-    if extracted.get("doc_type") not in DOC_TYPES:
-        extracted["doc_type"] = "Purchase Invoice"
-    if extracted.get("category") not in CATEGORIES:
-        extracted["category"] = "Miscellaneous"
-
+    # ── Parse the raw text into structured fields ──
+    extracted = parse_invoice_text(raw_text)
     return extracted
+
+
+def parse_invoice_text(text: str) -> dict:
+    """
+    Parses raw Tesseract OCR text into structured invoice fields
+    using regex patterns for Indian GST invoices.
+    """
+    import re
+
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    full = " ".join(lines)
+
+    def find_amount(patterns):
+        for p in patterns:
+            m = re.search(p, full, re.IGNORECASE)
+            if m:
+                val = m.group(1).replace(",", "").replace(" ", "")
+                try:
+                    return float(val)
+                except:
+                    pass
+        return 0.0
+
+    def find_text(patterns):
+        for p in patterns:
+            m = re.search(p, full, re.IGNORECASE)
+            if m:
+                return m.group(1).strip()
+        return ""
+
+    # ── Vendor: first bold/large line (usually first non-empty line) ──
+    vendor = lines[0] if lines else "Unknown"
+    # Clean common OCR artifacts
+    vendor = re.sub(r'[|\/*]', '', vendor).strip()
+
+    # ── Date ──
+    date_raw = find_text([
+        r"(?:invoice\s*date|date)[:\s]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
+        r"(\d{2}[-/]\d{2}[-/]\d{4})",
+        r"(\d{1,2}\s+\w+\s+\d{4})",
+    ])
+    if date_raw:
+        date_str = date_raw.replace("/", "-")
+    else:
+        date_str = date.today().strftime("%d-%m-%Y")
+
+    # ── GSTIN ──
+    gstin = find_text([
+        r"GSTIN?[:\s]+([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1})",
+        r"([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1})",
+    ])
+
+    # ── Amounts ──
+    total = find_amount([
+        r"(?:total\s*amount\s*payable|grand\s*total|total\s*amount|total)[:\s₹Rs.]*([0-9,]+\.?\d*)",
+        r"(?:amount\s*payable)[:\s₹Rs.]*([0-9,]+\.?\d*)",
+    ])
+    subtotal = find_amount([
+        r"(?:subtotal|sub\s*total|taxable\s*(?:amount|value))[:\s₹Rs.]*([0-9,]+\.?\d*)",
+    ])
+    cgst = find_amount([
+        r"CGST\s*@\s*\d+\.?\d*\s*%\s*(?:Rs\.?|INR)?\s*([0-9,]{3,}\.?\d*)",
+        r"CGST\s*(?:Rs\.?|INR|Rs)?\s*([0-9,]{3,}\.?\d*)",
+    ])
+    sgst = find_amount([
+        r"SGST\s*@\s*\d+\.?\d*\s*%\s*(?:Rs\.?|INR)?\s*([0-9,]{3,}\.?\d*)",
+        r"SGST\s*(?:Rs\.?|INR|Rs)?\s*([0-9,]{3,}\.?\d*)",
+    ])
+    igst = find_amount([
+        r"IGST\s*@\s*\d+\.?\d*\s*%\s*(?:Rs\.?|INR)?\s*([0-9,]{3,}\.?\d*)",
+        r"IGST\s*(?:Rs\.?|INR|Rs)?\s*([0-9,]{3,}\.?\d*)",
+    ])
+
+    # ── Fallback: if no subtotal found, derive it ──
+    if subtotal == 0.0 and total > 0:
+        tax = cgst + sgst + igst
+        subtotal = round(total - tax, 2) if tax > 0 else round(total / 1.18, 2)
+    if cgst == 0.0 and sgst == 0.0 and igst == 0.0 and total > 0 and subtotal > 0:
+        tax = round(total - subtotal, 2)
+        cgst = round(tax / 2, 2)
+        sgst = round(tax / 2, 2)
+
+    # ── Doc type ──
+    doc_type = "Purchase Invoice"
+    text_lower = full.lower()
+    if "credit note" in text_lower:
+        doc_type = "Credit Note"
+    elif "debit note" in text_lower:
+        doc_type = "Debit Note"
+    elif "sales invoice" in text_lower or "sale invoice" in text_lower:
+        doc_type = "Sales Invoice"
+    elif "expense" in text_lower or "receipt" in text_lower:
+        doc_type = "Expense Receipt"
+
+    # ── Category guess from keywords ──
+    category = "Miscellaneous"
+    kw_map = {
+        "Office Supplies":       ["stationery", "paper", "pen", "office supply"],
+        "Travel & Transport":    ["travel", "transport", "cab", "fuel", "flight", "hotel"],
+        "Food & Entertainment":  ["food", "restaurant", "cafe", "swiggy", "zomato"],
+        "Utilities":             ["electricity", "water", "internet", "broadband", "utility"],
+        "Rent":                  ["rent", "lease"],
+        "Professional Services": ["consulting", "legal", "audit", "professional"],
+        "IT & Software":         ["software", "laptop", "computer", "server", "cloud", "aws"],
+        "Marketing":             ["marketing", "advertisement", "campaign", "printing"],
+        "Raw Materials":         ["raw material", "seeds", "fertilizer", "agriculture", "agro"],
+    }
+    for cat, keywords in kw_map.items():
+        if any(kw in text_lower for kw in keywords):
+            category = cat
+            break
+
+    # ── Confidence: based on how much we found ──
+    found = sum([
+        bool(vendor and vendor != "Unknown"),
+        bool(gstin),
+        total > 0,
+        subtotal > 0,
+        cgst > 0 or sgst > 0 or igst > 0,
+    ])
+    confidence = min(60 + found * 8, 95)
+
+    return {
+        "vendor":     vendor,
+        "date":       date_str,
+        "gstin":      gstin,
+        "doc_type":   doc_type,
+        "subtotal":   subtotal,
+        "cgst":       cgst,
+        "sgst":       sgst,
+        "igst":       igst,
+        "total":      total,
+        "category":   category,
+        "confidence": confidence,
+    }
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -488,32 +571,32 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # ── API Key input ──
-    st.markdown(
-        "<div style='font-family:DM Mono,monospace;font-size:0.7rem;color:var(--muted);"
-        "text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.4rem;'>"
-        "Anthropic API Key</div>",
-        unsafe_allow_html=True,
-    )
-    api_key_input = st.text_input(
-        "API Key",
-        type="password",
-        placeholder="sk-ant-...",
-        label_visibility="collapsed",
-        key="api_key_widget",
-    )
-    # Always sync whatever is currently typed into session state
-    st.session_state.api_key = api_key_input.strip()
-
-    if st.session_state.api_key:
-        st.markdown(
-            "<div style='color:#00E5A0;font-size:0.78rem;margin-bottom:0.5rem;'>✓ API key set</div>",
-            unsafe_allow_html=True,
-        )
-    else:
+    # ── Tesseract status ──
+    try:
+        import pytesseract
+        import shutil
+        tess_found = shutil.which("tesseract") is not None
+        for _p in [r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                   r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe"]:
+            if os.path.exists(_p):
+                tess_found = True
+                break
+        if tess_found:
+            st.markdown(
+                "<div style='color:#00E5A0;font-size:0.78rem;margin-bottom:0.5rem;'>"
+                "✓ Tesseract ready — no API key needed</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                "<div style='color:#FFB547;font-size:0.78rem;margin-bottom:0.5rem;'>"
+                "⚠ Tesseract not found. Install from github.com/UB-Mannheim/tesseract/wiki</div>",
+                unsafe_allow_html=True,
+            )
+    except ImportError:
         st.markdown(
             "<div style='color:#FFB547;font-size:0.78rem;margin-bottom:0.5rem;'>"
-            "⚠ Enter key to enable OCR</div>",
+            "⚠ Run: pip install pytesseract pillow</div>",
             unsafe_allow_html=True,
         )
 
@@ -561,7 +644,7 @@ page = st.session_state.page
 # ── DASHBOARD ─────────────────────────────────────────────────────────────────
 if page == "Dashboard":
     st.markdown('<div class="finflow-logo" style="font-size:2rem;margin-bottom:0.25rem;">FinFlow</div>', unsafe_allow_html=True)
-    st.markdown('<p style="color:var(--muted);font-size:0.9rem;margin-bottom:2rem;">Automated Financial Document Processing — Claude Vision OCR</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color:var(--muted);font-size:0.9rem;margin-bottom:2rem;">Automated Financial Document Processing — Tesseract OCR (Local, Free)</p>', unsafe_allow_html=True)
 
     summary = get_summary()
 
@@ -625,11 +708,11 @@ if page == "Dashboard":
 # ── UPLOAD & EXTRACT ──────────────────────────────────────────────────────────
 elif page == "Upload & Extract":
     st.markdown('<div class="section-header" style="font-family:Syne,sans-serif;font-size:1.6rem;font-weight:800;">📤 Upload & Extract</div>', unsafe_allow_html=True)
-    st.markdown('<p style="color:var(--muted);">Upload handwritten receipts, printed invoices, or PDF documents. Claude Vision reads and extracts all key financial fields.</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color:var(--muted);">Upload handwritten receipts, printed invoices, or PDF documents. Tesseract OCR runs locally — no API key, no internet, completely free.</p>', unsafe_allow_html=True)
 
     # Warn if no API key
     if not st.session_state.api_key:
-        st.warning("⚠️ Please enter your Anthropic API key in the sidebar to enable real OCR extraction.")
+        st.warning("")
 
     col1, col2 = st.columns([1.1, 0.9])
 
@@ -651,14 +734,9 @@ elif page == "Upload & Extract":
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            if st.button("🔍 Extract with Claude Vision", use_container_width=True):
-                live_key = get_api_key()
-                if not live_key:
-                    st.error("API key required. Set ANTHROPIC_API_KEY env var or enter it in the sidebar.")
-                elif not (live_key.startswith("sk-ant-") or live_key.startswith("sk-")):
-                    st.error("Key looks wrong — Anthropic keys start with `sk-ant-`. Check for extra spaces or line breaks.")
-                else:
-                    with st.spinner("🔍 Claude is reading your document..."):
+            if st.button("🔍 Extract with Tesseract OCR", use_container_width=True):
+                if True:
+                    with st.spinner("🔍 Tesseract is reading your document..."):
                         try:
                             uploaded_file.seek(0)
                             extracted = real_ocr_extract(uploaded_file)
